@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from app.database import get_db_connection
+from app.schemas import User
+from app.schemas import Product
 
 app = FastAPI(title="E-commerce Backend API")
-
 
 @app.get("/health")
 def health_check():
@@ -11,9 +12,7 @@ def health_check():
         "service": "ecommerce-backend"
     }
 
-
-
-@app.get("/users")
+@app.get("/users", response_model=list[User])
 def list_users():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -35,7 +34,7 @@ def list_users():
 
     return users
 
-@app.get("/products")
+@app.get("/products", response_model=list[Product])
 def list_products():
     conn = get_db_connection()
     cursor = conn.cursor()
