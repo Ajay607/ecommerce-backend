@@ -1,11 +1,21 @@
-from fastapi import FastAPI
-from app.database import get_db_connection
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+
+from app.database import engine, get_db
+from fastapi import HTTPException
+from app import models
+
 from app.schemas import User
 from app.schemas import Product
 from app.schemas import ProductCreate
 from app.schemas import ProductWithOwner
 
+
+# Create tables
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI(title="E-commerce Backend API")
+
 
 @app.get("/health")
 def health_check():
@@ -14,165 +24,54 @@ def health_check():
         "service": "ecommerce-backend"
     }
 
+
 @app.get("/users", response_model=list[User])
-def list_users():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT id, name, email, is_active FROM users;")
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    users = []
-    for row in rows:
-        users.append({
-            "id": row[0],
-            "name": row[1],
-            "email": row[2],
-            "is_active": row[3]
-        })
-
+def list_users(db: Session = Depends(get_db)):
+    users = db.query(models.User).all()
     return users
 
 @app.get("/products", response_model=list[Product])
-def list_products():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id, name, price, owner_id
-        FROM products;
-    """)
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    products = []
-    for row in rows:
-        products.append({
-            "id": row[0],
-            "name": row[1],
-            "price": float(row[2]),
-            "owner_id": row[3]
-        })
-
+def list_products(db: Session = Depends(get_db)):
+    products = db.query(models.Product).all()
     return products
 
-@app.get("/products-with-owner", response_model=list[ProductWithOwner])
-def products_with_owner():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT
-            p.id,
-            p.name,
-            p.price,
-            u.name,
-            u.email
-        FROM products p
-        JOIN users u ON p.owner_id = u.id;
-    """)
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    result = []
-    for row in rows:
-        result.append({
-            "product_id": row[0],
-            "product_name": row[1],
-            "price": float(row[2]),
-            "owner_name": row[3],
-            "owner_email": row[4]
-        })
-
-    return result
-
-
 @app.post("/products", response_model=Product)
-def create_product(product: ProductCreate):
+def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # check owner exists
-    cursor.execute(
-        "SELECT id FROM users WHERE id = %s;",
-        (product.owner_id,)
-    )
-
-    owner = cursor.fetchone()
+    # Check if owner exists
+    owner = db.query(models.User).filter(models.User.id == product.owner_id).first()
 
     if owner is None:
+        raise HTTPException(status_code=404, detail="Owner not found")
 
-        cursor.close()
-        conn.close()
-
-        return {"error": "Owner not found"}
-
-    # insert product
-
-    cursor.execute(
-        """
-        INSERT INTO products (name, price, owner_id)
-        VALUES (%s, %s, %s)
-        RETURNING id, name, price, owner_id;
-        """,
-        (product.name, product.price, product.owner_id)
+    # Create Product object
+    new_product = models.Product(
+        name=product.name,
+        price=product.price,
+        owner_id=product.owner_id
     )
 
-    new_product = cursor.fetchone()
+    db.add(new_product)
+    db.commit()
+    db.refresh(new_product)
 
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return {
-        "id": new_product[0],
-        "name": new_product[1],
-        "price": float(new_product[2]),
-        "owner_id": new_product[3]
-    }
+    return new_product
 
 
 @app.get("/products-with-owner", response_model=list[ProductWithOwner])
-def products_with_owner():
+def products_with_owner(db: Session = Depends(get_db)):
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT
-            p.id,
-            p.name,
-            p.price,
-            u.name,
-            u.email
-        FROM products p
-        JOIN users u ON p.owner_id = u.id;
-    """)
-
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    products = db.query(models.Product).all()
 
     result = []
 
-    for row in rows:
-
+    for product in products:
         result.append({
-            "product_id": row[0],
-            "product_name": row[1],
-            "price": float(row[2]),
-            "owner_name": row[3],
-            "owner_email": row[4]
+            "product_id": product.id,
+            "product_name": product.name,
+            "price": float(product.price),
+            "owner_name": product.owner.name,
+            "owner_email": product.owner.email
         })
 
     return result
