@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import engine, get_db
 from fastapi import HTTPException
@@ -61,7 +61,7 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 @app.get("/products-with-owner", response_model=list[ProductWithOwner])
 def products_with_owner(db: Session = Depends(get_db)):
 
-    products = db.query(models.Product).all()
+    products = db.query(models.Product).options(selectinload(models.Product.owner)).all()
 
     result = []
 
