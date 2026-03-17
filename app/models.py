@@ -1,7 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Table
 from sqlalchemy.orm import relationship
 from app.database import Base
-
 
 class User(Base):
     __tablename__ = "users"
@@ -11,8 +10,26 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     is_active = Column(Boolean, default=True)
 
-    # Relationship
     products = relationship("Product", back_populates="owner")
+
+product_categories = Table(
+    "product_categories",
+    Base.metadata,
+    Column("product_id", ForeignKey("products.id"), primary_key=True),
+    Column("category_id", ForeignKey("categories.id"), primary_key=True)
+)
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    products = relationship(
+        "Product",
+        secondary=product_categories,
+        back_populates="categories"
+    )
 
 
 class Product(Base):
@@ -24,5 +41,10 @@ class Product(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
 
-    # Relationship
     owner = relationship("User", back_populates="products")
+
+    categories = relationship(
+        "Category",
+        secondary=product_categories,
+        back_populates="products"
+    )
