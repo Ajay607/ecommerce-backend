@@ -27,15 +27,25 @@ def health_check():
         "service": "ecommerce-backend"
     }
 
-
 @app.get("/users", response_model=list[User])
 def list_users(db: Session = Depends(get_db)):
     users = db.query(models.User).all()
     return users
 
 @app.get("/products", response_model=list[Product])
-def list_products(db: Session = Depends(get_db)):
-    products = db.query(models.Product).all()
+def list_products(
+    limit: int = 10,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+
+    products = (
+        db.query(models.Product)
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+
     return products
 
 @app.post("/products", response_model=Product)
@@ -60,7 +70,6 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 
     return new_product
 
-
 @app.get("/products-with-owner", response_model=list[ProductWithOwner])
 def products_with_owner(db: Session = Depends(get_db)):
 
@@ -79,7 +88,6 @@ def products_with_owner(db: Session = Depends(get_db)):
 
     return result
 
-
 @app.post("/categories", response_model=Category)
 def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
 
@@ -95,7 +103,6 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
 def list_categories(db: Session = Depends(get_db)):
     categories = db.query(models.Category).all()
     return categories
-
 
 @app.post("/products/{product_id}/categories")
 def assign_categories_to_product(
