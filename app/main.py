@@ -12,6 +12,7 @@ from app.schemas import ProductWithOwner
 from app.schemas import CategoryCreate, Category
 from app.schemas import ProductCategoryAssign  
 from app.schemas import ProductWithCategories 
+from app.schemas import OrderCreate, OrderResponse
 
 
 # Create tables
@@ -144,3 +145,75 @@ def get_product_with_categories(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
 
     return product
+
+
+@app.post("/orders", response_model=OrderResponse)
+def create_order(order: OrderCreate, db: Session = Depends(get_db)):
+
+    # check if user exists
+    user = db.query(models.User).filter(models.User.id == order.user_id).first()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # create order
+    new_order = models.Order(user_id=order.user_id)
+
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
+
+    total_amount = 0
+
+    order_items_list = []
+
+    for item in order.items:
+
+        product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+
+        if product is None:
+            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+
+        price = product.price
+
+        total_amount += price * item.quantity
+
+        order_item = models.OrderItem(
+            order_id=new_order.id,
+            product_id=item.product_id,
+            quantity=item.quantity,
+            price=price
+        )
+
+        db.add(order_item)
+
+        order_items_list.append(order_item)
+
+    new_order.total_amount = total_amount
+
+    db.commit()
+
+    db.refresh(new_order)
+
+    new_order.items = order_items_list
+
+    return new_order
+
+
+@app.get("/orders/{order_id}", response_model=OrderResponse)
+def get_order(order_id: int, db: Session = Depends(get_db)):
+
+    order = (
+        db.query(models.Order)
+        .options(
+            joinedload(models.Order.items)
+            .joinedload(models.OrderItem.product)
+        )
+        .filter(models.Order.id == order_id)
+        .first()
+    )
+
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    return order

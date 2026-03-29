@@ -68,3 +68,69 @@ class ProductWithCategories(BaseModel):
 
     class Config:
         from_attributes = True
+        
+
+class OrderItemCreate(BaseModel):
+    product_id: int
+    quantity: int
+    
+
+class OrderCreate(BaseModel):
+    user_id: int
+    items: list[OrderItemCreate]
+    
+
+class OrderItemResponse(BaseModel):
+    product_id: int
+    quantity: int
+    price: float
+
+    class Config:
+        from_attributes = True
+        
+
+class OrderResponse(BaseModel):
+    id: int
+    user_id: int
+    total_amount: float
+    status: str
+    items: list[OrderItemResponse]
+
+    class Config:
+        from_attributes = True
+        
+
+class ProductSimple(BaseModel):
+    id: int
+    name: str
+    price: float
+
+    class Config:
+        from_attributes = True
+        
+        
+class OrderItemResponse(BaseModel):
+    quantity: int
+    price: float
+    product: ProductSimple
+
+    class Config:
+        from_attributes = True
+        
+
+class ProductSimple(BaseModel):
+    id: int
+    name: str
+    price: float
+
+    class Config:
+        from_attributes = True
+        
+
+class OrderItemResponse(BaseModel):
+    quantity: int
+    price: float
+    product: ProductSimple
+
+    class Config:
+        from_attributes = True
